@@ -12,6 +12,7 @@ from modules.steps import Step, StepView
 
 class KBH(FlaskView):
 
+
     @route('/', methods=['GET'])
     def get(self):
         conn = None
@@ -19,7 +20,7 @@ class KBH(FlaskView):
             if not os.path.exists(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db'):
                 self.api.notify(headline="File Not Found", message="Please upload a Kleiner Brauhelfer Database", type="danger")
                 return ('', 404)
-
+            # test kbh1 databse format
             conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
             c = conn.cursor()
             c.execute('SELECT ID, Sudname, BierWurdeGebraut FROM Sud')
@@ -27,11 +28,25 @@ class KBH(FlaskView):
             result = []
             for row in data:
                 result.append({"id": row[0], "name": row[1], "brewed": row[2]})
+            KBH_VERSION = 1
             return json.dumps(result)
-        except Exception as e:
-            print e
-            self.api.notify(headline="Failed to load KHB database", message="ERROR", type="danger")
-            return ('', 500)
+        except:
+            # if kbh1 format does not work, try kbh2 database format
+            try:
+                conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
+                c = conn.cursor()
+                c.execute('SELECT ID, Sudname, Status FROM Sud')
+                data = c.fetchall()
+                result = []
+                for row in data:
+                    result.append({"id": row[0], "name": row[1], "brewed": row[2]})
+                KBH_VERSION = 2
+                return json.dumps(result)
+            except Exception as e:
+                print e
+                self.api.notify(headline="Failed to load KHB database", message="ERROR", type="danger")
+                return ('', 500)
+
         finally:
             if conn:
                 conn.close()
@@ -72,20 +87,35 @@ class KBH(FlaskView):
         try:
             conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
             c = conn.cursor()
-            c.execute('SELECT EinmaischenTemp, Sudname FROM Sud WHERE ID = ?', (id,))
-            row = c.fetchone()
-            name = row[1]
+            try: # kbh database v1
+                c.execute('SELECT EinmaischenTemp, Sudname FROM Sud WHERE ID = ?', (id,))
+                row = c.fetchone()
+                name = row[1]
+                self.api.set_config_parameter("brew_name", name)
+                Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
 
-            self.api.set_config_parameter("brew_name", name)
-            Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
-            ### add rest step
-            for row in c.execute('SELECT * FROM Rasten WHERE SudID = ?', (id,)):
-                Step.insert(**{"name": row[5], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[3], "timer": row[4]}})
-            Step.insert(**{"name": "Chil", "type": chilstep_type, "config": {"timer": 15}})
-            ## Add cooking step
-            c.execute('SELECT max(Zeit) FROM Hopfengaben WHERE SudID = ?', (id,))
-            row = c.fetchone()
-            Step.insert(**{"name": "Boil", "type": boilstep_type, "config": {"kettle": boil_kettle, "temp": boil_temp, "timer": row[0]}})
+                for row in c.execute('SELECT * FROM Rasten WHERE SudID = ?', (id,)):
+                    Step.insert(**{"name": row[5], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[3], "timer": row[4]}})
+                Step.insert(**{"name": "Chil", "type": chilstep_type, "config": {"timer": 15}})
+                ## Add cooking step
+                c.execute('SELECT max(Zeit) FROM Hopfengaben WHERE SudID = ?', (id,))
+                row = c.fetchone()
+                Step.insert(**{"name": "Boil", "type": boilstep_type, "config": {"kettle": boil_kettle, "temp": boil_temp, "timer": row[0]}})
+            except:
+                c.execute('SELECT Sudname FROM Sud WHERE ID = ?', (id,))
+                row = c.fetchone()
+                name = row[0]
+                self.api.set_config_parameter("brew_name", name)
+                c.execute('SELECT Temp FROM Rasten WHERE Typ = 0 AND SudID = ?', (id,))
+                Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
+                for row in c.execute('SELECT Name, Temp, Dauer FROM Rasten WHERE Typ <> 0 AND SudID = ?', (id,)):
+                    Step.insert(**{"name": row[0], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[1], "timer": row[2]}})
+                Step.insert(**{"name": "Chil", "type": chilstep_type, "config": {"timer": 15}})
+                ## Add cooking step
+                c.execute('SELECT Kochdauer FROM Sud WHERE ID = ?', (id,))
+                row = c.fetchone()
+                Step.insert(**{"name": "Boil", "type": boilstep_type, "config": {"kettle": boil_kettle, "temp": boil_temp, "timer": row[0]}})
+
             ## Add Whirlpool step
             Step.insert(**{"name": "Whirlpool", "type": chilstep_type, "config": {"timer": 15}})
 
