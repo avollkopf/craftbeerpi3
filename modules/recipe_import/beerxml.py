@@ -10,7 +10,9 @@ import os
 from modules.steps import Step,StepView
 import xml.etree.ElementTree
 
+
 class BeerXMLImport(FlaskView):
+
     BEER_XML_FILE = "./upload/beer.xml"
     @route('/', methods=['GET'])
     def get(self):
@@ -45,54 +47,104 @@ class BeerXMLImport(FlaskView):
 
     @route('/<int:id>', methods=['POST'])
     def load(self, id):
-
-
+        bm_recipe_creation = cbpi.get_config_parameter("bm_recipe_creation", None)
+        self.api.notify(headline="Braumeister Recipe Upload", message="Activated: %s" % bm_recipe_creation)
         steps = self.getSteps(id)
         boil_time_alerts = self.getBoilAlerts(id)
+        first_wort_alert = self.getFirstWortAlert(id)
         name = self.getRecipeName(id)
         self.api.set_config_parameter("brew_name", name)
         boil_time = self.getBoilTime(id)
-        mashstep_type = cbpi.get_config_parameter("step_mash", "MashStep")
+        boil_kettle = cbpi.get_config_parameter("step_boil_kettle", None)
+        boil_temp = 99 if cbpi.get_config_parameter("unit", "C") == "C" else 210
         mash_kettle = cbpi.get_config_parameter("step_mash_kettle", None)
 
-        boilstep_type = cbpi.get_config_parameter("step_boil", "BoilStep")
-        boil_kettle = cbpi.get_config_parameter("step_boil_kettle", None)
-        boil_temp = 100 if cbpi.get_config_parameter("unit", "C") == "C" else 212
+        if bm_recipe_creation == "NO" or bm_recipe_creation is None:
+            mashstep_type = cbpi.get_config_parameter("step_mash", "MashStep")
+            boilstep_type = cbpi.get_config_parameter("step_boil", "BoilStep")
+        else:
+            mashinstep_type = "BM_MashInStep"
+            mashstep_type = "BM_MashStep"
+            mashoutstep_type = "BM_MashOutStep"
+            boilstep_type = "BM_BoilStep"
+            firstwortstep_type = "BM_FirstWortHop"
+            removemaltpipe_type = "BM_RemoveMaltPipe"
 
+  
         # READ KBH DATABASE
         Step.delete_all()
         StepView().reset()
 
         try:
-
-            for row in steps:
-                Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
-            Step.insert(**{"name": "ChilStep", "type": "ChilStep", "config": {"timer": 15}})
-            ## Add boiling step
-            Step.insert(**{
-                "name": "Boil",
-                "type": boilstep_type,
-                "config": {
-                    "kettle": boil_kettle,
-                    "temp": boil_temp,
-                    "timer": boil_time,
-                    ## Beer XML defines additions as the total time spent in boiling,
-                    ## CBP defines it as time-until-alert
-
-                    ## Also, The model supports five boil-time additions.
-                    ## Set the rest to None to signal them being absent
-                    "hop_1": boil_time - boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
-                    "hop_2": boil_time - boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
-                    "hop_3": boil_time - boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
-                    "hop_4": boil_time - boil_time_alerts[3] if len(boil_time_alerts) >= 4 else None,
-                    "hop_5": boil_time - boil_time_alerts[4] if len(boil_time_alerts) >= 5 else None
-                }
-            })
-            ## Add Whirlpool step
-            Step.insert(**{"name": "Whirlpool", "type": "ChilStep", "config": {"timer": 15}})
-            StepView().reset()
-            self.api.emit("UPDATE_ALL_STEPS", Step.get_all())
-            self.api.notify(headline="Recipe %s loaded successfully" % name, message="")
+            if bm_recipe_creation == "NO" or bm_recipe_creation is None:
+                for row in steps:
+                    Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
+                Step.insert(**{"name": "ChilStep", "type": "ChilStep", "config": {"timer": 15}})
+                ## Add boiling step
+                Step.insert(**{
+                    "name": "Boil",
+                    "type": boilstep_type,
+                    "config": {
+                        "kettle": boil_kettle,
+                        "temp": boil_temp,
+                        "timer": boil_time,
+                        ## Beer XML defines additions as the total time spent in boiling,
+                        ## CBP defines it as time-until-alert
+    
+                        ## Also, The model supports five boil-time additions.
+                        ## Set the rest to None to signal them being absent
+                        "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
+                        "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
+                        "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
+                        "hop_4": boil_time_alerts[3] if len(boil_time_alerts) >= 4 else None,
+                        "hop_5": boil_time_alerts[4] if len(boil_time_alerts) >= 5 else None
+                    }
+                })
+                ## Add Whirlpool step
+                Step.insert(**{"name": "Whirlpool", "type": "ChilStep", "config": {"timer": 15}})
+                StepView().reset()
+                self.api.emit("UPDATE_ALL_STEPS", Step.get_all())
+                self.api.notify(headline="Recipe %s loaded successfully" % name, message="")
+            else:
+                MashIn_Flag = True
+                for row in steps:
+                    if MashIn_Flag == True and row.get("timer") == 0:
+                        Step.insert(**{"name": row.get("name"), "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
+                        MashIn_Flag = False 
+                    else:
+                        Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
+                ## Add Step to remove malt pipe
+                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": 0 }})
+                First_Wort_Flag=len(first_wort_alert)
+                if First_Wort_Flag != 0:
+                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": 0 }})
+                ## Add boiling step
+                Step.insert(**{
+                    "name": "Boil",
+                    "type": boilstep_type,
+                    "config": {
+                        "kettle": boil_kettle,
+                        "temp": boil_temp,
+                        "timer": boil_time,
+                        ## Beer XML defines additions as the total time spent in boiling,
+                        ## CBP defines it as time-until-alert
+    
+                        ## Also, The model supports five boil-time additions.
+                        ## Set the rest to None to signal them being absent
+                        "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
+                        "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
+                        "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
+                        "hop_4": boil_time_alerts[3] if len(boil_time_alerts) >= 4 else None,
+                        "hop_5": boil_time_alerts[4] if len(boil_time_alerts) >= 5 else None
+                    }
+                })
+                ## Add Whirlpool step
+                Step.insert(**{"name": "Whirlpool", "type": "ChilStep", "config": {"timer": 15}})
+                StepView().reset()
+                self.api.emit("UPDATE_ALL_STEPS", Step.get_all())
+                self.api.notify(headline="Recipe %s loaded successfully" % name, message="")
+              
+ 
         except Exception as e:
             self.api.notify(headline="Failed to load Recipe", message=e.message, type="danger")
             return ('', 500)
@@ -119,9 +171,29 @@ class BeerXMLImport(FlaskView):
                 continue
 
             alerts.append(float(e.find('TIME').text))
-
-        ## There might also be miscelaneous additions during boild time
+           ## There might also be miscelaneous additions during boild time
         for e in recipe.findall('MISCS/MISC[USE="Boil"]'):
+            alerts.append(float(e.find('TIME').text))
+
+        ## Dedupe and order the additions by their time, to prevent multiple alerts at the same time
+        alerts = sorted(list(set(alerts)))
+
+        ## CBP should have these additions in reverse
+        alerts.reverse()
+
+        return alerts
+
+    def getFirstWortAlert(self, id):
+        e = xml.etree.ElementTree.parse(self.BEER_XML_FILE).getroot()
+
+        recipe = e.find('./RECIPE[%s]' % (str(id)))
+        alerts = []
+        for e in recipe.findall('./HOPS/HOP'):
+            use = e.find('USE').text
+            ## Hops which are not used in the boil step should not cause alerts
+            if use != 'First Wort':
+                continue
+
             alerts.append(float(e.find('TIME').text))
 
         ## Dedupe and order the additions by their time, to prevent multiple alerts at the same time
