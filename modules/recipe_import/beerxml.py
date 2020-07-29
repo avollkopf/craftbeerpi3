@@ -114,10 +114,10 @@ class BeerXMLImport(FlaskView):
                     else:
                         Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
                 ## Add Step to remove malt pipe
-                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": 0 }})
+                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": 0, "timer": 0 }})
                 First_Wort_Flag=len(first_wort_alert)
                 if First_Wort_Flag != 0:
-                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": 0 }})
+                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
                 ## Add boiling step
                 Step.insert(**{
                     "name": "Boil",

@@ -16,6 +16,7 @@ class KBH(FlaskView):
     @route('/', methods=['GET'])
     def get(self):
         conn = None
+        global KBH_VERSION
         try:
             if not os.path.exists(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db'):
                 self.api.notify(headline="File Not Found", message="Please upload a Kleiner Brauhelfer Database", type="danger")
@@ -72,13 +73,27 @@ class KBH(FlaskView):
 
     @route('/<int:id>', methods=['POST'])
     def load(self, id):
-        mashstep_type = cbpi.get_config_parameter("step_mash", "MashStep")
-        mashinstep_type = cbpi.get_config_parameter("step_mashin", "MashInStep")
+        bm_recipe_creation = cbpi.get_config_parameter("bm_recipe_creation", None)
+        self.api.notify(headline="Braumeister Recipe Upload", message="Activated: %s" % bm_recipe_creation)
+
+        if bm_recipe_creation == "YES" and KBH_VERSION == 2:
+            mashstep_type = "BM_MashStep"
+            mashinstep_type = "BM_MashInStep"
+            mashoutstep_type = "BM_MashOutStep"
+            boilstep_type = "BM_BoilStep"
+            firstwortstep_type = "BM_FirstWortHop"
+            removemaltpipe_type = "BM_RemoveMaltPipe"
+            boil_temp = 99 if cbpi.get_config_parameter("unit", "C") == "C" else 210
+
+        else:
+            mashstep_type = cbpi.get_config_parameter("step_mash", "MashStep")
+            mashinstep_type = cbpi.get_config_parameter("step_mashin", "MashInStep")
+            boilstep_type = cbpi.get_config_parameter("step_boil", "BoilStep")
+            boil_temp = 100 if cbpi.get_config_parameter("unit", "C") == "C" else 212
+
         chilstep_type = cbpi.get_config_parameter("step_chil", "ChilStep")
-        boilstep_type = cbpi.get_config_parameter("step_boil", "BoilStep")
         mash_kettle = cbpi.get_config_parameter("step_mash_kettle", None)
         boil_kettle = cbpi.get_config_parameter("step_boil_kettle", None)
-        boil_temp = 100 if cbpi.get_config_parameter("unit", "C") == "C" else 212
 
         # READ KBH DATABASE
         Step.delete_all()
@@ -87,7 +102,7 @@ class KBH(FlaskView):
         try:
             conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
             c = conn.cursor()
-            try: # kbh database v1
+            if KBH_VERSION == 1: # kbh database v1
                 c.execute('SELECT EinmaischenTemp, Sudname FROM Sud WHERE ID = ?', (id,))
                 row = c.fetchone()
                 name = row[1]
@@ -101,7 +116,7 @@ class KBH(FlaskView):
                 c.execute('SELECT max(Zeit) FROM Hopfengaben WHERE SudID = ?', (id,))
                 row = c.fetchone()
                 Step.insert(**{"name": "Boil", "type": boilstep_type, "config": {"kettle": boil_kettle, "temp": boil_temp, "timer": row[0]}})
-            except:
+            else: # KBH Version 2 databse
                 c.execute('SELECT Sudname FROM Sud WHERE ID = ?', (id,))
                 row = c.fetchone()
                 name = row[0]
@@ -110,11 +125,36 @@ class KBH(FlaskView):
                 Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
                 for row in c.execute('SELECT Name, Temp, Dauer FROM Rasten WHERE Typ <> 0 AND SudID = ?', (id,)):
                     Step.insert(**{"name": row[0], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[1], "timer": row[2]}})
-                Step.insert(**{"name": "Chil", "type": chilstep_type, "config": {"timer": 15}})
-                ## Add cooking step
+                ## Add Step to remove malt pipe
+                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+                ## Check if first wort step needs to be added
+                first_wort_alert = self.getFirstWortAlert(id)
+                if first_wort_alert == True:
+                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+                ## Add boil step
+                boil_time_alerts = self.getBoilAlerts(id)
                 c.execute('SELECT Kochdauer FROM Sud WHERE ID = ?', (id,))
                 row = c.fetchone()
-                Step.insert(**{"name": "Boil", "type": boilstep_type, "config": {"kettle": boil_kettle, "temp": boil_temp, "timer": row[0]}})
+                ## Add boiling step
+                Step.insert(**{
+                    "name": "Boil",
+                    "type": boilstep_type,
+                    "config": {
+                        "kettle": boil_kettle,
+                        "temp": boil_temp,
+                        "timer": row[0],
+                        ## Beer XML defines additions as the total time spent in boiling,
+                        ## CBP defines it as time-until-alert
+    
+                        ## Also, The model supports five boil-time additions.
+                        ## Set the rest to None to signal them being absent
+                        "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
+                        "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
+                        "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
+                        "hop_4": boil_time_alerts[3] if len(boil_time_alerts) >= 4 else None,
+                        "hop_5": boil_time_alerts[4] if len(boil_time_alerts) >= 5 else None
+                    }
+                })
 
             ## Add Whirlpool step
             Step.insert(**{"name": "Whirlpool", "type": chilstep_type, "config": {"timer": 15}})
@@ -130,7 +170,57 @@ class KBH(FlaskView):
                 conn.close()
         return ('', 204)
 
+    def getBoilAlerts(self, id):
+        alerts = []
+        try:
+            conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
+            c = conn.cursor()
+            # get the hop addition times
+            c.execute('SELECT Zeit FROM Hopfengaben WHERE Vorderwuerze = 0 AND SudID = ?', (id,))
+            rows = c.fetchall()
 
+            for row in rows:
+                alerts.append(float(row[0]))
+
+            # get any misc additions if available
+            c.execute('SELECT Zugabedauer FROM WeitereZutatenGaben WHERE Zeitpunkt = 1 AND SudID = ?', (id,))
+            rows = c.fetchall()
+
+            for row in rows:
+                alerts.append(float(row[0]))
+
+
+            ## Dedupe and order the additions by their time, to prevent multiple alerts at the same time
+            alerts = sorted(list(set(alerts)))
+
+            ## CBP should have these additions in reverse
+            alerts.reverse()
+        except Exception as e:
+            self.api.notify(headline="Failed to load Recipe", message=e.message, type="danger")
+            return ('', 500)
+        finally:
+            if conn:
+                conn.close()
+
+        return alerts
+
+
+    def getFirstWortAlert(self, id):
+        alert = False
+        try:
+            conn = sqlite3.connect(self.api.app.config['UPLOAD_FOLDER'] + '/kbh.db')
+            c = conn.cursor()
+            c.execute('SELECT Zeit FROM Hopfengaben WHERE Vorderwuerze = 1 AND SudID = ?', (id,))
+            row = c.fetchall()
+            if len(row) != 0:
+                alert = True
+        except Exception as e:
+            self.api.notify(headline="Failed to load Recipe", message=e.message, type="danger")
+            return ('', 500)
+        finally:
+            if conn:
+                conn.close()
+        return alert
 
 @cbpi.initalizer()
 def init(cbpi):
