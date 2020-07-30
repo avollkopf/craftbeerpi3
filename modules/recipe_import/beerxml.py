@@ -65,10 +65,10 @@ class BeerXMLImport(FlaskView):
         else:
             mashinstep_type = "BM_MashInStep"
             mashstep_type = "BM_MashStep"
-            mashoutstep_type = "BM_MashOutStep"
+            mashoutstep_type = "BM_ManualStep"
             boilstep_type = "BM_BoilStep"
-            firstwortstep_type = "BM_FirstWortHop"
-            removemaltpipe_type = "BM_RemoveMaltPipe"
+            firstwortstep_type = "BM_ManualStep"
+#            removemaltpipe_type = "BM_RemoveMaltPipe"
 
   
         # READ KBH DATABASE
@@ -80,7 +80,10 @@ class BeerXMLImport(FlaskView):
                 for row in steps:
                     Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
                 Step.insert(**{"name": "ChilStep", "type": "ChilStep", "config": {"timer": 15}})
-                ## Add boiling step
+                First_Wort_Flag=len(first_wort_alert)
+                if First_Wort_Flag != 0:
+                    Step.insert(**{"name": "First Wort Hopping", "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+               ## Add boiling step
                 Step.insert(**{
                     "name": "Boil",
                     "type": boilstep_type,
@@ -114,10 +117,31 @@ class BeerXMLImport(FlaskView):
                     else:
                         Step.insert(**{"name": row.get("name"), "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": float(row.get("temp")), "timer": row.get("timer")}})
                 ## Add Step to remove malt pipe
-                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": 0, "timer": 0 }})
+                Step.insert(**{
+                    "name": "Remove Malt Pipe", 
+                    "type": mashoutstep_type, 
+                    "config": {
+                        "heading": "MashOut Step Completed!",
+                        "message": "Please remove Malt Pipe and Sparge. Press Next to continue",
+                        "notifyType": "info",
+                        "proceed": "Pause",
+                        "kettle": mash_kettle
+                    }
+                })
                 First_Wort_Flag=len(first_wort_alert)
                 if First_Wort_Flag != 0:
-                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+                    Step.insert(**{
+                        "name": "First Wort Hopping", 
+                        "type": firstwortstep_type, 
+                        "config": {
+                            "heading": "First Wort Hop Addition!",
+                            "message": "Please add hops for first wort",
+                            "notifyType": "info",
+                            "proceed": "Continue",
+                            "kettle": mash_kettle
+                        }
+                    })
+                    
                 ## Add boiling step
                 Step.insert(**{
                     "name": "Boil",

@@ -79,10 +79,10 @@ class KBH(FlaskView):
         if bm_recipe_creation == "YES" and KBH_VERSION == 2:
             mashstep_type = "BM_MashStep"
             mashinstep_type = "BM_MashInStep"
-            mashoutstep_type = "BM_MashOutStep"
+            mashoutstep_type = "BM_ManualStep"
             boilstep_type = "BM_BoilStep"
-            firstwortstep_type = "BM_FirstWortHop"
-            removemaltpipe_type = "BM_RemoveMaltPipe"
+            firstwortstep_type = "BM_ManualStep"
+#            removemaltpipe_type = "BM_RemoveMaltPipe"
             boil_temp = 99 if cbpi.get_config_parameter("unit", "C") == "C" else 210
 
         else:
@@ -125,12 +125,35 @@ class KBH(FlaskView):
                 Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
                 for row in c.execute('SELECT Name, Temp, Dauer FROM Rasten WHERE Typ <> 0 AND SudID = ?', (id,)):
                     Step.insert(**{"name": row[0], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[1], "timer": row[2]}})
+                ## Add Step to remove malt pipe and eventually first wort hop step if BM recipe usage is defined
+                if bm_recipe_creation == "YES" :
                 ## Add Step to remove malt pipe
-                Step.insert(**{"name": "Remove Malt Pipe", "type": mashoutstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+                    Step.insert(**{
+                        "name": "Remove Malt Pipe", 
+                        "type": mashoutstep_type, 
+                        "config": {
+                            "heading": "MashOut Step Completed!",
+                            "message": "Please remove Malt Pipe and Sparge. Press Next to continue",
+                            "notifyType": "info",
+                            "proceed": "Pause",
+                            "kettle": mash_kettle
+                        }
+                    })
                 ## Check if first wort step needs to be added
-                first_wort_alert = self.getFirstWortAlert(id)
-                if first_wort_alert == True:
-                    Step.insert(**{"name": "First Wort Hopping", "type": firstwortstep_type, "config": {"kettle": mash_kettle, "temp": 0 , "timer": 0 }})
+                    first_wort_alert = self.getFirstWortAlert(id)
+                    if first_wort_alert == True:
+                        Step.insert(**{
+                            "name": "First Wort Hopping", 
+                            "type": firstwortstep_type, 
+                            "config": {
+                                "heading": "First Wort Hop Addition!",
+                                "message": "Please add hops for first wort",
+                                "notifyType": "info",
+                                "proceed": "Continue",
+                                "kettle": mash_kettle
+                            }
+                        })
+
                 ## Add boil step
                 boil_time_alerts = self.getBoilAlerts(id)
                 c.execute('SELECT Kochdauer FROM Sud WHERE ID = ?', (id,))
