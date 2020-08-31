@@ -18,6 +18,8 @@ app = Flask(__name__)
 FORMAT = '%(asctime)-15s - %(levelname)s - %(message)s'
 
 logging.basicConfig(filename='./logs/app.log',level=logging.INFO, format=FORMAT)
+logging.getLogger('socketio').setLevel(logging.ERROR)
+logging.getLogger('engineio').setLevel(logging.ERROR)
 app.config['SECRET_KEY'] = 'craftbeerpi'
 app.config['UPLOAD_FOLDER'] = './upload'
 

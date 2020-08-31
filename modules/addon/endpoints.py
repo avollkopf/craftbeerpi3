@@ -133,8 +133,13 @@ def plugins():
     :return:
     """
     response = requests.get("https://raw.githubusercontent.com/Manuel83/craftbeerpi-plugins/master/plugins.yaml")
+<<<<<<< Updated upstream
     cbpi.cache["plugins"] = merge(yaml.load(response.text), cbpi.cache["plugins"])
     for key, value in  cbpi.cache["plugins"].iteritems():
+=======
+    cbpi.cache["plugins"] = merge(yaml.safe_load(response.text), cbpi.cache["plugins"])
+    for key, value in  cbpi.cache["plugins"].items():
+>>>>>>> Stashed changes
         value["installed"] = os.path.isdir("./modules/plugins/%s/" % (key))
 
     return json.dumps(cbpi.cache["plugins"])

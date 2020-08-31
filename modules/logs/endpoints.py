@@ -56,12 +56,32 @@ class LogView(FlaskView):
 
         import csv
         array = []
+<<<<<<< Updated upstream
         with open(filename, 'rb') as f:
             reader = csv.reader(f)
             for row in reader:
                 try:
                     array.append([int((datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S") - datetime.datetime(1970, 1, 1)).total_seconds()) * 1000, float(row[1])])
                 except:
+=======
+        with open(filename, 'r', encoding='utf-8') as csv_file:
+            reader = csv.reader(csv_file)
+            l_time = 0
+            for row in reader:
+                try:
+#                    array.append([
+#                        int((datetime.datetime.strptime(
+#                            row[0], "%Y-%m-%d %H:%M:%S") -
+#                             datetime.datetime(1970, 1, 1)).total_seconds()) *
+#                        1000,
+#                        float(row[1])
+#                    ])
+                    p_time=int((datetime.datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S") - datetime.datetime(1970, 1, 1)).total_seconds()) * 1000
+                    if ( abs(float(row[1])) < 100 ) and ( p_time >= l_time ):
+                        l_time = p_time + 120000;
+                        array.append([p_time , float(row[1])])
+                except IndexError:
+>>>>>>> Stashed changes
                     pass
         return array
 

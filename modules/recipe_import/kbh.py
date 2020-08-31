@@ -44,7 +44,11 @@ class KBH(FlaskView):
                 KBH_VERSION = 2
                 return json.dumps(result)
             except Exception as e:
+<<<<<<< Updated upstream
                 print e
+=======
+                print (e)
+>>>>>>> Stashed changes
                 self.api.notify(headline="Failed to load KHB database", message="ERROR", type="danger")
                 return ('', 500)
 
@@ -141,6 +145,7 @@ class KBH(FlaskView):
                     })
                 ## Check if first wort step needs to be added
                     first_wort_alert = self.getFirstWortAlert(id)
+<<<<<<< Updated upstream
                     if first_wort_alert == True:
                         Step.insert(**{
                             "name": "First Wort Hopping", 
@@ -153,6 +158,20 @@ class KBH(FlaskView):
                                 "kettle": mash_kettle
                             }
                         })
+=======
+#                    if first_wort_alert == True:
+#                        Step.insert(**{
+#                            "name": "First Wort Hopping", 
+#                            "type": firstwortstep_type, 
+#                            "config": {
+#                                "heading": "First Wort Hop Addition!",
+#                                "message": "Please add hops for first wort",
+#                                "notifyType": "info",
+#                                "proceed": "Continue",
+#                                "kettle": mash_kettle
+#                            }
+#                        })
+>>>>>>> Stashed changes
 
                 ## Add boil step
                 boil_time_alerts = self.getBoilAlerts(id)
@@ -171,6 +190,10 @@ class KBH(FlaskView):
     
                         ## Also, The model supports five boil-time additions.
                         ## Set the rest to None to signal them being absent
+<<<<<<< Updated upstream
+=======
+                        "first_wort_hop": 'Yes'  if first_wort_alert == True else 'No',
+>>>>>>> Stashed changes
                         "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
                         "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
                         "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
