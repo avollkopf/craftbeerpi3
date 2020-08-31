@@ -2,19 +2,6 @@
 
 This is CraftBeerPi version 3.0. It's currently in beta status.
 
-## Modifications:
-Fork from original repo with some modifications:
-
-2020-07-29
-- Modifications of kbh.py to support recipe creation of Braumeister recipe steps
-	- First Wort Hop, Boil times for hops and misc have been added
-	
-2020-07-28
-- updated requirements.txt file to avoid installation problems
-- Modification of kbh.py recipe import to support Kleiner Brauhelfer V2 (Database Version 2005)
-- Modification of beerxml.py to support recipe creation of Braumeister recipe steps
-
-
 ## Introduction Video
 
 https://www.youtube.com/watch?v=YGARUJgFWh4&t=1s

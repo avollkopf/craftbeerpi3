@@ -4,7 +4,7 @@ craftbeerpi.db
 **/node_modules/*
 *.pyc
 *.templog
-__pycache__/
+
 modules/plugins/*
 !modules/plugins/__init__.py
 *.pyc
@@ -17,3 +17,8 @@ yarn.lock
 
 
 modules/ui/package-lock.json
+
+.python-version
+upload/*
+*.bak
+.vscode

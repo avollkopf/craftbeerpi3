@@ -129,20 +129,6 @@ class BeerXMLImport(FlaskView):
                     }
                 })
                 First_Wort_Flag=len(first_wort_alert)
-<<<<<<< Updated upstream
-                if First_Wort_Flag != 0:
-                    Step.insert(**{
-                        "name": "First Wort Hopping", 
-                        "type": firstwortstep_type, 
-                        "config": {
-                            "heading": "First Wort Hop Addition!",
-                            "message": "Please add hops for first wort",
-                            "notifyType": "info",
-                            "proceed": "Continue",
-                            "kettle": mash_kettle
-                        }
-                    })
-=======
 #                if First_Wort_Flag != 0:
 #                    Step.insert(**{
 #                        "name": "First Wort Hopping", 
@@ -155,7 +141,6 @@ class BeerXMLImport(FlaskView):
 #                            "kettle": mash_kettle
 #                        }
 #                    })
->>>>>>> Stashed changes
                     
                 ## Add boiling step
                 Step.insert(**{
@@ -170,10 +155,7 @@ class BeerXMLImport(FlaskView):
     
                         ## Also, The model supports five boil-time additions.
                         ## Set the rest to None to signal them being absent
-<<<<<<< Updated upstream
-=======
                         "first_wort_hop": 'Yes'  if First_Wort_Flag != 0 else 'No',                       
->>>>>>> Stashed changes
                         "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
                         "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
                         "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
