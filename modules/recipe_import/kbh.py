@@ -122,6 +122,7 @@ class KBH(FlaskView):
                 name = row[0]
                 self.api.set_config_parameter("brew_name", name)
                 c.execute('SELECT Temp FROM Rasten WHERE Typ = 0 AND SudID = ?', (id,))
+                row = c.fetchone()
                 Step.insert(**{"name": "MashIn", "type": mashinstep_type, "config": {"kettle": mash_kettle, "temp": row[0]}})
                 for row in c.execute('SELECT Name, Temp, Dauer FROM Rasten WHERE Typ <> 0 AND SudID = ?', (id,)):
                     Step.insert(**{"name": row[0], "type": mashstep_type, "config": {"kettle": mash_kettle, "temp": row[1], "timer": row[2]}})
