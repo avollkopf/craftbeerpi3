@@ -82,7 +82,6 @@ class KBH(FlaskView):
             mashoutstep_type = "BM_ManualStep"
             boilstep_type = "BM_BoilStep"
             firstwortstep_type = "BM_ManualStep"
-#            removemaltpipe_type = "BM_RemoveMaltPipe"
             boil_temp = 99 if cbpi.get_config_parameter("unit", "C") == "C" else 210
 
         else:
@@ -141,20 +140,7 @@ class KBH(FlaskView):
                         }
                     })
                 ## Check if first wort step needs to be added
-                    first_wort_alert = self.getFirstWortAlert(id)
-#                    if first_wort_alert == True:
-#                        Step.insert(**{
-#                            "name": "First Wort Hopping", 
-#                            "type": firstwortstep_type, 
-#                            "config": {
-#                                "heading": "First Wort Hop Addition!",
-#                                "message": "Please add hops for first wort",
-#                                "notifyType": "info",
-#                                "proceed": "Continue",
-#                                "kettle": mash_kettle
-#                            }
-#                        })
-
+                first_wort_alert = self.getFirstWortAlert(id)
                 ## Add boil step
                 boil_time_alerts = self.getBoilAlerts(id)
                 c.execute('SELECT Kochdauer FROM Sud WHERE ID = ?', (id,))
@@ -169,7 +155,7 @@ class KBH(FlaskView):
                         "timer": row[0],
                         ## Beer XML defines additions as the total time spent in boiling,
                         ## CBP defines it as time-until-alert
-    
+     
                         ## Also, The model supports five boil-time additions.
                         ## Set the rest to None to signal them being absent
                         "first_wort_hop": 'Yes'  if first_wort_alert == True else 'No',
@@ -180,7 +166,6 @@ class KBH(FlaskView):
                         "hop_5": boil_time_alerts[4] if len(boil_time_alerts) >= 5 else None
                     }
                 })
-
             ## Add Whirlpool step
             Step.insert(**{"name": "Whirlpool", "type": chilstep_type, "config": {"timer": 15}})
 

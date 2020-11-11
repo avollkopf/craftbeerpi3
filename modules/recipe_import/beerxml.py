@@ -129,19 +129,6 @@ class BeerXMLImport(FlaskView):
                     }
                 })
                 First_Wort_Flag=len(first_wort_alert)
-#                if First_Wort_Flag != 0:
-#                    Step.insert(**{
-#                        "name": "First Wort Hopping", 
-#                        "type": firstwortstep_type, 
-#                        "config": {
-#                            "heading": "First Wort Hop Addition!",
-#                            "message": "Please add hops for first wort",
-#                            "notifyType": "info",
-#                            "proceed": "Continue",
-#                            "kettle": mash_kettle
-#                        }
-#                    })
-                    
                 ## Add boiling step
                 Step.insert(**{
                     "name": "Boil",
