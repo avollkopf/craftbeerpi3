@@ -157,19 +157,22 @@ class BoilStep(StepBase):
     Just put the decorator @cbpi.step on top of a method
     '''
     # Properties
+    first_wort_hop_flag = False
     temp = Property.Number("Temperature", configurable=True, default_value=100, description="Target temperature for boiling")
     kettle = StepProperty.Kettle("Kettle", description="Kettle in which the boiling step takes place")
-    timer = Property.Number("Timer in Minutes", configurable=True, default_value=90, description="Timer is started when target temperature is reached")
-    hop_1 = Property.Number("Hop 1 Addition", configurable=True, description="Fist Hop alert")
+    timer = Property.Number("Timer in Minutes", configurable=True, description="Timer is started when target temperature is reached")
+    first_wort_hop = Property.Select("First Wort Hop Addition", options=["Yes","No"], description="First Wort Hop alert if set to Yes")
+    hop_1 = Property.Number("Hop 1 Addition", configurable=True, description="First Hop alert (minutes before finish)")
     hop_1_added = Property.Number("",default_value=None)
-    hop_2 = Property.Number("Hop 2 Addition", configurable=True, description="Second Hop alert")
+    hop_2 = Property.Number("Hop 2 Addition", configurable=True, description="Second Hop alert (minutes before finish)")
     hop_2_added = Property.Number("", default_value=None)
-    hop_3 = Property.Number("Hop 3 Addition", configurable=True)
-    hop_3_added = Property.Number("", default_value=None, description="Third Hop alert")
-    hop_4 = Property.Number("Hop 4 Addition", configurable=True)
-    hop_4_added = Property.Number("", default_value=None, description="Fourth Hop alert")
-    hop_5 = Property.Number("Hop 5 Addition", configurable=True)
-    hop_5_added = Property.Number("", default_value=None, description="Fives Hop alert")
+    hop_3 = Property.Number("Hop 3 Addition", configurable=True, description="Third Hop alert (minutes before finish)")
+    hop_3_added = Property.Number("", default_value=None)
+    hop_4 = Property.Number("Hop 4 Addition", configurable=True, description="Fourth Hop alert (minutes before finish)")
+    hop_4_added = Property.Number("", default_value=None)
+    hop_5 = Property.Number("Hop 5 Addition", configurable=True, description="Fifth Hop alert (minutes before finish)")
+    hop_5_added = Property.Number("", default_value=None)
+
 
     def init(self):
         '''
@@ -201,17 +204,22 @@ class BoilStep(StepBase):
 
 
     def check_hop_timer(self, number, value):
-        if isinstance(value, int) and \
-            self.__getattribute__("hop_%s_added" % number) is not True and time.time() > (
-            self.timer_end - (int(self.timer) * 60 - int(value) * 60)):
-            self.__setattr__("hop_%s_added" % number, True)
-            self.notify("Hop Alert", "Please add Hop %s" % number, timeout=None)
+        s = cbpi.cache.get("active_step")
+        hop_added = getattr(s,"hop_%s_added" % number)
+        if value is not None and hop_added is not True:
+            if time.time() > (self.timer_end - int(value) * 60):
+                self.__setattr__("hop_%s_added" % number, True)
+                self.notify("Hop Alert", "Please add Hop %s" % number, timeout=None)
 
     def execute(self):
         '''
         This method is execute in an interval
         :return:
         '''
+        if self.first_wort_hop_flag == False and self.first_wort_hop == "Yes":
+            self.first_wort_hop_flag = True
+            self.notify("First Wort Hop Addition!","Please add hops for first wort",timeout=None)
+
         # Check if Target Temp is reached
         if self.get_kettle_temp(self.kettle) >= float(self.temp):
             # Check if Timer is Running
@@ -223,7 +231,14 @@ class BoilStep(StepBase):
                 self.check_hop_timer(3, self.hop_3)
                 self.check_hop_timer(4, self.hop_4)
                 self.check_hop_timer(5, self.hop_5)
+
         # Check if timer finished and go to next step
         if self.is_timer_finished() == True:
             self.notify("Boil Step Completed!", "Starting the next step", timeout=None)
-            next(self)
+            #Python 2
+            try: 
+                self.next()
+            #Python3
+            except:
+                next(self)
+            pass

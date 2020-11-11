@@ -68,7 +68,6 @@ class BeerXMLImport(FlaskView):
             mashoutstep_type = "BM_ManualStep"
             boilstep_type = "BM_BoilStep"
             firstwortstep_type = "BM_ManualStep"
-#            removemaltpipe_type = "BM_RemoveMaltPipe"
 
   
         # READ KBH DATABASE
@@ -96,6 +95,7 @@ class BeerXMLImport(FlaskView):
     
                         ## Also, The model supports five boil-time additions.
                         ## Set the rest to None to signal them being absent
+                        "first_wort_hop": 'Yes'  if First_Wort_Flag != 0 else 'No',
                         "hop_1": boil_time_alerts[0] if len(boil_time_alerts) >= 1 else None,
                         "hop_2": boil_time_alerts[1] if len(boil_time_alerts) >= 2 else None,
                         "hop_3": boil_time_alerts[2] if len(boil_time_alerts) >= 3 else None,
