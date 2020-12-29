@@ -1,4 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
+"""
+cbpi runner
+"""
 
 from modules import socketio, app, cbpi
 
